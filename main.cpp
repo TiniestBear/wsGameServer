@@ -1,7 +1,7 @@
 #include <iostream>
-#include <websocketpp/config/asio_no_tls.hpp>
-#include <websocketpp/server.hpp>
-#include <iostream>
+#include "websocketpp/server.hpp"
+#include "websocketpp/config/asio_no_tls.hpp"
+#include "MessageHandler.h"
 
 typedef websocketpp::server<websocketpp::config::asio> server;
 using websocketpp::lib::placeholders::_1;
@@ -10,31 +10,18 @@ using websocketpp::lib::bind;
 
 typedef server::message_ptr message_ptr;
 
-void on_message(server* s, websocketpp::connection_hdl hdl, message_ptr msg) {
-    std::cout << "on_message called with hdl: " << hdl.lock().get()
-              << " and message: " << msg->get_payload()
-              << std::endl;
-
-    // check for a special command to instruct the server to stop listening so
-    // it can be cleanly exited.
-    if (msg->get_payload() == "stop-listening") {
-        s->stop_listening();
-        return;
-    }
-
-    try {
-        s->send(hdl, msg->get_payload(), msg->get_opcode());
-    } catch (websocketpp::exception const & e) {
-        std::cout << "Echo failed because: "
-                  << "(" << e.what() << ")" << std::endl;
-    }
-}
-
 int main() {
     std::cout << "Herle Werle" << std::endl;
 
-        // Create a server endpoint
+    // Create a server endpoint
     server echo_server;
+
+    // Create a server endpoint
+    MessageHandler* msgHandler = new MessageHandler();
+
+    auto onMessage = [&msgHandler](server* s, websocketpp::connection_hdl hdl, message_ptr msg) -> void {
+        msgHandler->on_message(s, hdl, msg);
+    };
 
     try {
         // Set logging settings
@@ -45,7 +32,7 @@ int main() {
         echo_server.init_asio();
 
         // Register our message handler
-        echo_server.set_message_handler(bind(&on_message,&echo_server,::_1,::_2));
+        echo_server.set_message_handler(bind(onMessage,&echo_server,::_1,::_2));
 
         // Listen on port 9002
         echo_server.listen(9002);
